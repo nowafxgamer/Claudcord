@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ar" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Claudcord</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root { --r:#1e1f22; --s:#2b2d31; --m:#313338; --i:#383a40; --t:#f2f3f5; --mu:#949ba4; --a:#5865f2; --g:#23a559; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; margin:0; }
+  body { background:var(--m); color:var(--t); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
+  button, input, textarea { font-family:inherit; font-size:15px; }
+  #app { display:flex; height:100%; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
+  #rail { width:68px; background:var(--r); display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 0; overflow-y:auto; flex:none; }
+  .sv { width:46px; height:46px; border-radius:50%; border:0; background:var(--m); color:var(--t); font-weight:700; cursor:pointer; flex:none; transition:border-radius .15s; }
+  .sv:hover, .sv.on { border-radius:14px; background:var(--a); }
+  .sv.add { color:var(--g); font-size:24px; }
+  #side { width:220px; background:var(--s); display:flex; flex-direction:column; flex:none; }
+  #sname { padding:14px; font-weight:700; border-bottom:1px solid var(--r); display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  #sname span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #chs { flex:1; overflow-y:auto; padding:8px; }
+  .ch { display:block; width:100%; text-align:left; background:none; border:0; color:var(--mu); padding:8px 10px; border-radius:6px; cursor:pointer; }
+  .ch:hover, .ch.on { background:var(--i); color:var(--t); }
+  .mini { background:none; border:0; color:var(--mu); cursor:pointer; font-size:18px; }
+  #me { padding:10px 14px; background:var(--r); font-size:14px; display:flex; justify-content:space-between; align-items:center; }
+  #main { flex:1; display:flex; flex-direction:column; min-width:0; }
+  #top { padding:12px 14px; border-bottom:1px solid var(--r); display:flex; gap:10px; align-items:center; font-weight:700; min-height:48px; }
+  #burger { display:none; }
+  #msgs { flex:1; overflow-y:auto; padding:10px 14px; display:flex; flex-direction:column; }
+  .msg { display:flex; gap:10px; margin-top:12px; }
+  .msg.cont { margin-top:2px; }
+  .av { width:38px; height:38px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; }
+  .cont .av { visibility:hidden; height:0; }
+  .nm { font-weight:600; } .tm { color:var(--mu); font-size:11px; margin-inline-start:8px; }
+  .tx { white-space:pre-wrap; word-break:break-word; line-height:1.4; }
+  #form { padding:10px 14px 14px; }
+  #inp { width:100%; background:var(--i); color:var(--t); border:0; border-radius:10px; padding:12px 14px; outline:none; }
+  .empty { margin:auto; text-align:center; color:var(--mu); padding:30px; line-height:1.9; }
+  #setup { position:fixed; inset:0; background:var(--m); display:flex; align-items:center; justify-content:center; padding:20px; z-index:20; overflow-y:auto; }
+  .box { background:var(--s); border-radius:14px; padding:20px; width:100%; max-width:420px; line-height:1.7; }
+  .box h2 { margin:0 0 8px; }
+  .box input, .box textarea { width:100%; background:var(--r); border:0; color:var(--t); border-radius:8px; padding:11px; margin:6px 0 10px; direction:ltr; }
+  .btn { background:var(--a); color:#fff; border:0; border-radius:8px; padding:10px 16px; cursor:pointer; margin-inline-end:8px; margin-top:4px; }
+  .btn.alt { background:var(--i); }
+  .hint { color:var(--mu); font-size:13px; } .err { color:#ff6b6b; font-size:13px; min-height:20px; }
+  @media (max-width:700px) {
+    #side { position:fixed; left:68px; top:0; bottom:0; z-index:10; transform:translateX(-300px); transition:transform .2s; box-shadow:0 0 20px #0008; }
+    #rail { position:fixed; left:0; top:0; bottom:0; z-index:11; transform:translateX(-80px); transition:transform .2s; }
+    body.open #side, body.open #rail { transform:none; }
+    #burger { display:block; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <nav id="rail"></nav>
+  <aside id="side">
+    <div id="sname"><span id="sn"></span><button class="mini" id="share" title="كود الدعوة">🔗</button></div>
+    <div id="chs"></div>
+    <div id="me"><span id="mn"></span><button class="mini" id="out" title="تسجيل خروج">⏻</button></div>
+  </aside>
+  <section id="main">
+    <div id="top"><button class="mini" id="burger">☰</button><span id="cn"></span></div>
+    <div id="msgs"></div>
+    <form id="form"><input id="inp" placeholder="اكتب رسالة…" autocomplete="off" disabled></form>
+  </section>
+</div>
+<div id="setup" style="display:none"></div>
+<script>
+var LS = window.localStorage, $ = function (i) { return document.getElementById(i); };
+var auth, db, me = null, srvs = [], mode = null, cur = null, curCh = null, dmPeer = null;
+var chRef = null, msgRef = null, srvRef = null, lastUser = null;
+var TS = function () { return firebase.database.ServerValue.TIMESTAMP; };
+
+// إعداد Firebase الثابت: حط الـ apiKey بين علامتي التنصيص وخلاص، ما أحد يحتاج يلصق شي
+var BUILTIN = {
+  apiKey: "",
+  authDomain: "claudcord.firebaseapp.com",
+  databaseURL: "https://claudcord-default-rtdb.firebaseio.com",
+  projectId: "claudcord",
+  appId: "1:427282244363:web:f45fda3480d685e41fb80e"
+};
+
+function h(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function color(s) { var n = 0; for (var i = 0; i < s.length; i++) n = (n * 31 + s.charCodeAt(i)) % 360; return "hsl(" + n + ",55%,48%)"; }
+function pairId(a, b) { return [a, b].sort().join("_"); }
+function showBox(html, ready) { var s = $("setup"); s.style.display = "flex"; s.innerHTML = '<div class="box">' + html + "</div>"; ready(s); }
+function hideBox() { $("setup").style.display = "none"; }
+
+// ---------- إعداد Firebase ----------
+function parseCfg(text) {
+  var o = {}, re = /["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g, m;
+  while ((m = re.exec(text))) o[m[1]] = m[2];
+  if (!o.apiKey || !o.projectId) return null;
+  if (!o.databaseURL) o.databaseURL = "https://" + o.projectId + "-default-rtdb.firebaseio.com";
+  return o;
+}
+
+function askConfig() {
+  showBox('<h2>ربط Firebase</h2><div class="hint">من Firebase: Project settings ← Your apps ← أضف تطبيق ويب (&lt;/&gt;) ← انسخ كتلة firebaseConfig كاملة والصقها هنا.</div>' +
+    '<textarea id="cfg" rows="7" placeholder="const firebaseConfig = { apiKey: ..., projectId: ... }"></textarea><div class="err" id="er"></div><button class="btn" id="ok">حفظ</button>',
+    function (s) {
+      s.querySelector("#ok").onclick = function () {
+        var c = parseCfg(s.querySelector("#cfg").value);
+        if (!c) { s.querySelector("#er").textContent = "ما لقيت apiKey و projectId في النص"; return; }
+        LS.setItem("cfg", JSON.stringify(c)); start();
+      };
+    });
+}
+
+// ---------- الحساب ----------
+function authErr(e) {
+  var m = { "auth/email-already-in-use": "اسم المستخدم محجوز", "auth/invalid-credential": "اسم المستخدم أو كلمة السر غلط",
+    "auth/wrong-password": "اسم المستخدم أو كلمة السر غلط", "auth/user-not-found": "اسم المستخدم أو كلمة السر غلط",
+    "auth/operation-not-allowed": "فعّل Email/Password من Authentication في Firebase", "auth/weak-password": "كلمة السر قصيرة (٦ أحرف على الأقل)",
+    "auth/network-request-failed": "تأكد من الإنترنت" };
+  return m[e.code] || e.message;
+}
+
+function askAuth() {
+  showBox('<h2>Claudcord</h2><input id="u" placeholder="اسم المستخدم (حروف إنجليزية صغيرة وأرقام و _)" autocapitalize="none" maxlength="20">' +
+    '<input id="p" type="password" placeholder="كلمة السر"><div class="err" id="er"></div>' +
+    '<button class="btn" id="li">دخول</button><button class="btn alt" id="su">حساب جديد</button>',
+    function (s) {
+      var er = s.querySelector("#er");
+      function vals() { return { u: s.querySelector("#u").value.trim().toLowerCase(), p: s.querySelector("#p").value }; }
+      s.querySelector("#li").onclick = function () {
+        var v = vals(); er.textContent = "";
+        auth.signInWithEmailAndPassword(v.u + "@claudcord.app", v.p).catch(function (e) { er.textContent = authErr(e); });
+      };
+      s.querySelector("#su").onclick = function () {
+        var v = vals(); er.textContent = "";
+        if (!/^[a-z0-9_]{3,20}$/.test(v.u)) { er.textContent = "الاسم: ٣-٢٠ حرف إنجليزي صغير أو رقم أو _"; return; }
+        auth.createUserWithEmailAndPassword(v.u + "@claudcord.app", v.p).then(function (c) {
+          return db.ref("usernames/" + v.u).set(c.user.uid);
+        }).catch(function (e) { er.textContent = authErr(e); });
+      };
+    });
+}
+
+function start() {
+  if (!/^https?:$/.test(location.protocol)) {
+    return showBox('<h2>لازم يفتح من رابط</h2><div class="hint">Firebase Auth ما يشتغل لما الملف ينفتح من الجوال مباشرة (content:// أو file://). ' +
+      'ارفعه على استضافة مجانية (GitHub Pages أو Netlify) وافتحه من الرابط، أو حوّله لـ APK بـ Capacitor.</div>', function () {});
+  }
+  var cfg = BUILTIN.apiKey ? BUILTIN : JSON.parse(LS.getItem("cfg") || "null");
+  if (!cfg) return askConfig();
+  if (!firebase.apps.length) firebase.initializeApp(cfg);
+  auth = firebase.auth(); db = firebase.database();
+  auth.onAuthStateChanged(function (u) {
+    if (u) { me = { uid: u.uid, name: (u.email || "").split("@")[0] }; hideBox(); ready(); }
+    else { me = null; cleanup(); askAuth(); }
+  });
+}
+
+function cleanup() {
+  [chRef, msgRef, srvRef].forEach(function (r) { if (r) r.off(); });
+  chRef = msgRef = srvRef = null; srvs = []; mode = cur = curCh = dmPeer = null;
+  $("rail").innerHTML = ""; $("chs").innerHTML = ""; $("msgs").innerHTML = "";
+}
+
+function ready() {
+  $("mn").textContent = me.name;
+  srvRef = db.ref("userServers/" + me.uid);
+  srvRef.on("value", function (snap) {
+    srvs = []; snap.forEach(function (c) { srvs.push({ sid: c.key, name: c.val().name, code: c.val().code }); });
+    renderRail();
+  });
+  openDMs();
+}
+
+// ---------- الشريط الجانبي ----------
+function renderRail() {
+  var r = $("rail"); r.innerHTML = "";
+  var d = h("button", "sv" + (mode === "dm" ? " on" : ""), "💬"); d.title = "رسائل خاصة"; d.onclick = function () { openDMs(); document.body.classList.remove("open"); };
+  r.appendChild(d);
+  srvs.forEach(function (s) {
+    var b = h("button", "sv" + (mode === "srv" && cur && cur.sid === s.sid ? " on" : ""), s.name.slice(0, 2));
+    b.title = s.name; b.onclick = function () { openServer(s); document.body.classList.remove("open"); };
+    r.appendChild(b);
+  });
+  var a = h("button", "sv add", "+"); a.onclick = askAdd; r.appendChild(a);
+}
+
+function resetChat(placeholder) {
+  if (msgRef) { msgRef.off(); msgRef = null; }
+  $("msgs").innerHTML = ""; lastUser = null; curCh = null;
+  var empty = h("div", "empty", placeholder); $("msgs").appendChild(empty);
+  $("cn").textContent = ""; $("inp").disabled = true;
+}
+
+// ---------- الرسائل الخاصة ----------
+function openDMs() {
+  if (chRef) chRef.off();
+  mode = "dm"; cur = null; dmPeer = null;
+  $("sn").textContent = "رسائل خاصة"; $("share").style.display = "none";
+  resetChat("اختر محادثة، أو ابدأ وحدة جديدة بكتابة اسم المستخدم لصاحبك");
+  renderRail();
+  chRef = db.ref("userDms/" + me.uid);
+  chRef.on("value", function (snap) {
+    var list = []; snap.forEach(function (c) { list.push({ uid: c.key, name: c.val().name, ts: c.val().ts || 0 }); });
+    list.sort(function (a, b) { return b.ts - a.ts; });
+    var box = $("chs"); box.innerHTML = "";
+    list.forEach(function (p) {
+      var b = h("button", "ch" + (dmPeer && dmPeer.uid === p.uid ? " on" : ""), "@ " + p.name);
+      b.onclick = function () { openDm(p); document.body.classList.remove("open"); };
+      box.appendChild(b);
+    });
+    var add = h("button", "ch", "+ محادثة جديدة"); add.onclick = newDm; box.appendChild(add);
+  });
+}
+
+function newDm() {
+  var n = (prompt("اسم المستخدم لصاحبك؟") || "").trim().toLowerCase();
+  if (!n) return;
+  db.ref("usernames/" + n).once("value").then(function (s) {
+    if (!s.exists()) return alert("ما لقيت هذا المستخدم");
+    if (s.val() === me.uid) return alert("هذا اسمك أنت");
+    openDm({ uid: s.val(), name: n });
+  }).catch(function (e) { alert("خطأ: " + e.message); });
+}
+
+function openDm(p) {
+  dmPeer = p; mode = "dm";
+  $("cn").textContent = "@ " + p.name;
+  $("inp").disabled = false; $("inp").placeholder = "رسالة إلى " + p.name;
+  Array.prototype.forEach.call($("chs").children, function (b) { b.classList.toggle("on", b.textContent === "@ " + p.name); });
+  listen("dms/" + pairId(me.uid, p.uid));
+}
+
+// ---------- السيرفرات ----------
+function askAdd() {
+  showBox('<h2>سيرفر</h2><input id="nm" maxlength="30" placeholder="اسم سيرفر جديد"><button class="btn" id="mk">إنشاء</button>' +
+    '<hr style="border:0;border-top:1px solid var(--i);margin:14px 0"><input id="cd" maxlength="6" placeholder="كود دعوة (٦ أحرف)"><button class="btn alt" id="jn">انضمام</button>' +
+    '<button class="btn alt" id="cl">إغلاق</button><div class="err" id="er"></div>',
+    function (s) {
+      var er = s.querySelector("#er");
+      s.querySelector("#cl").onclick = hideBox;
+      s.querySelector("#mk").onclick = function () {
+        var n = s.querySelector("#nm").value.trim(); if (!n) return;
+        var sid = db.ref("servers").push().key, code = Math.random().toString(36).slice(2, 8).toUpperCase(), up = {};
+        up["servers/" + sid + "/name"] = n; up["servers/" + sid + "/code"] = code;
+        up["servers/" + sid + "/members/" + me.uid] = true;
+        up["servers/" + sid + "/channels/general/name"] = "general";
+        up["codes/" + code] = sid; up["userServers/" + me.uid + "/" + sid] = { name: n, code: code };
+        db.ref().update(up).then(function () { hideBox(); openServer({ sid: sid, name: n, code: code }); })
+          .catch(function (e) { er.textContent = "خطأ: " + e.message; });
+      };
+      s.querySelector("#jn").onclick = function () {
+        var c = s.querySelector("#cd").value.trim().toUpperCase(); if (!c) return;
+        var sid;
+        db.ref("codes/" + c).once("value").then(function (x) {
+          if (!x.exists()) throw new Error("الكود غير صحيح");
+          sid = x.val();
+          return db.ref("servers/" + sid + "/members/" + me.uid).set(true);
+        }).then(function () { return db.ref("servers/" + sid + "/name").once("value"); })
+          .then(function (nm) {
+            var o = { sid: sid, name: nm.val() || "سيرفر", code: c };
+            return db.ref("userServers/" + me.uid + "/" + sid).set({ name: o.name, code: c }).then(function () { hideBox(); openServer(o); });
+          }).catch(function (e) { er.textContent = e.message; });
+      };
+    });
+}
+
+function openServer(s) {
+  if (chRef) chRef.off();
+  mode = "srv"; cur = s; dmPeer = null;
+  $("sn").textContent = s.name; $("share").style.display = "";
+  resetChat("اختر قناة"); renderRail();
+  var first = true;
+  chRef = db.ref("servers/" + s.sid + "/channels");
+  chRef.on("value", function (snap) {
+    var list = []; snap.forEach(function (c) { list.push({ id: c.key, name: c.val().name }); });
+    var box = $("chs"); box.innerHTML = "";
+    list.forEach(function (c) {
+      var b = h("button", "ch" + (curCh === c.id ? " on" : ""), "# " + c.name);
+      b.onclick = function () { openChannel(c); document.body.classList.remove("open"); };
+      box.appendChild(b);
+    });
+    var add = h("button", "ch", "+ قناة جديدة"); add.onclick = newChannel; box.appendChild(add);
+    if (first && list.length) { first = false; openChannel(list[0]); }
+  });
+}
+
+function newChannel() {
+  var n = (prompt("اسم القناة؟") || "").trim().toLowerCase().replace(/\s+/g, "-").slice(0, 30);
+  if (n && cur) db.ref("servers/" + cur.sid + "/channels").push({ name: n });
+}
+
+function openChannel(c) {
+  curCh = c.id; $("cn").textContent = "# " + c.name;
+  $("inp").disabled = false; $("inp").placeholder = "رسالة في #" + c.name;
+  Array.prototype.forEach.call($("chs").children, function (b) { b.classList.toggle("on", b.textContent === "# " + c.name); });
+  listen("messages/" + cur.sid + "/" + c.id);
+}
+
+// ---------- عرض وإرسال ----------
+function listen(path) {
+  if (msgRef) msgRef.off();
+  var box = $("msgs"); box.innerHTML = ""; lastUser = null;
+  msgRef = db.ref(path).orderByKey().limitToLast(100);
+  msgRef.on("child_added", function (s) { addMsg(s.val()); },
+    function (e) { box.innerHTML = ""; box.appendChild(h("div", "empty", "ما عندك صلاحية لقراءة هذه المحادثة: " + e.message)); });
+}
+
+function addMsg(m) {
+  var box = $("msgs"), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  var cont = lastUser === m.uid; lastUser = m.uid;
+  var row = h("div", "msg" + (cont ? " cont" : ""));
+  var av = h("div", "av", (m.u || "?").charAt(0).toUpperCase()); av.style.background = color(m.u || "?");
+  var body = h("div"); body.style.minWidth = 0;
+  if (!cont) {
+    var hd = h("div"), nm = h("span", "nm", m.u); nm.style.color = color(m.u || "?");
+    var tm = h("span", "tm", m.ts ? new Date(m.ts).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
+    hd.appendChild(nm); hd.appendChild(tm); body.appendChild(hd);
+  }
+  var tx = h("div", "tx", m.t); tx.dir = "auto"; body.appendChild(tx);
+  row.appendChild(av); row.appendChild(body); box.appendChild(row);
+  if (atBottom || m.uid === me.uid) box.scrollTop = box.scrollHeight;
+}
+
+$("form").onsubmit = function (e) {
+  e.preventDefault();
+  var t = $("inp").value.trim(); if (!t) return;
+  var msg = { u: me.name, uid: me.uid, t: t.slice(0, 2000), ts: TS() };
+  if (mode === "dm" && dmPeer) {
+    db.ref("dms/" + pairId(me.uid, dmPeer.uid)).push(msg);
+    var up = {};
+    up["userDms/" + me.uid + "/" + dmPeer.uid] = { name: dmPeer.name, ts: TS() };
+    up["userDms/" + dmPeer.uid + "/" + me.uid] = { name: me.name, ts: TS() };
+    db.ref().update(up);
+  } else if (mode === "srv" && cur && curCh) {
+    db.ref("messages/" + cur.sid + "/" + curCh).push(msg);
+  } else return;
+  $("inp").value = "";
+};
+
+$("share").onclick = function () {
+  if (!cur) return;
+  showBox('<h2>دعوة أصحابك</h2><div>أعطهم هذا الكود، وينضمون من الزر + ← انضمام:</div>' +
+    '<h1 style="letter-spacing:4px;direction:ltr;text-align:center">' + cur.code + '</h1><button class="btn" id="cl">تم</button>',
+    function (s) { s.querySelector("#cl").onclick = hideBox; });
+};
+$("out").onclick = function () { if (auth) auth.signOut(); };
+$("burger").onclick = function () { document.body.classList.toggle("open"); };
+
+start();
+</script>
+</body>
+</html>
